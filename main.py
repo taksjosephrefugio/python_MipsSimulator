@@ -30,7 +30,7 @@ curr_int_str = "error"                  # holds the string equivalent of the cur
 def ReadFile():
     global Hex_Machine_Array
 
-    File = open("testcase_4a.txt", "r")                        # opening the file
+    File = open("input.txt", "r")                        # opening the file
     Hex_Machine_Array = File.read().splitlines()        # reading line-by-line
     codeCount = len(Hex_Machine_Array)
     tempString = " "
@@ -43,7 +43,7 @@ def ReadFile():
 
     for i in range(codeCount):
         temp = format(int(Hex_Machine_Array[i], 16), "032b")
-        Bin_Machine_Array.append(temp)
+        Bin_Machine_Array.append(temp) 
 
 # prints the contents of memory
 def PrintMemory():
