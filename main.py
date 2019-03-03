@@ -2,7 +2,7 @@
 # This program takes in a machine code written in Hexadecimal and simulate MIPS based on said machine code
 # At the end of the program, this should give a summary of values held in the registers and in the Memory Address Array
 # Code Written for: ECE-366 Spring 2019, UIC, Prof. Wenjing Rao
-# Code Written by: Tak's Joseph Refugio, J.B., Rohith
+# Code Written by: Tak's Joseph Refugio, J.B. Ruutelmann, Rohith 'Fortnight' Roy
 # Code Written on: February 2019
 
 # takes in a number n and returns an array of zeroes with size n
@@ -22,9 +22,11 @@ pc = 0                                  # stores pc count in int
 reg = InitZero(17);                     # stores int values for $8-$23
 MemoryArray = InitZero(501)             # 501 Memory Addresses: 0x2000-0x3000
 Hex_Machine_Array = []                  # a string array of machine code hex values that needed to be read in later
-Bin_Machine_Array = []
+Bin_Machine_Array = []                  # int-wise same as hex but is now stored as binary string
+HamWt_Array = []                        # stores the hamming weight for S0 - S15
 ProcessState = 'ON'                     # tells whether to keep going or end the processing
-curr_int_str = "error"                  # holds the string equivalent of the current instruction
+curr_int_str = "error"                  # holds the string eq   uivalent of the current instruction
+instr_count = 0                         # holds the instruction count
 
 # reads input.txt as source
 def ReadFile():
@@ -47,18 +49,24 @@ def ReadFile():
 
 # prints the contents of memory
 def PrintMemory():
-    x = hex(8192);
+    x = 8192;   #integer version of 0x2000
+    
     y = 0;  #border trigger
     z = 0;  #trigger for printing top/bottom borders
+    
     for i in range( len(MemoryArray) ):
         if (MemoryArray[i] != 0):
-            if(not z):
-                print("################################")
+            if(not z):  #if there is a value in memory
+                print("####################################################")
+                print('\t\t\t\t\t\t\t| M E M O R Y      |\n')
                 z+=1
-            print("# Address: ", x, "| Value:", MemoryArray[i], " #"); y+=1;
-            x = hex(int(x, 16)+4)   #cast to int, increment, return as hex
+            print("# Address: ", hex(x), "| Value:", MemoryArray[i], " #"); y+=1;
+            
+        x+=4
+       
     if(z):
-        print("################################")
+        print("\n")
+
     if(not y):
         print("###################")
         print("# Memory is empty #");
@@ -67,7 +75,8 @@ def PrintMemory():
 # prints the contents of memory
 def PrintRegisters():
     count = 0
-    print("------------")
+    print("---------------------------------")
+    print("\t\t\t\t\t\t\t| R E G I S T E R S |     \n")
     for i in range(17):
         if i is 0:
             if reg[i] is not 0:
@@ -81,7 +90,54 @@ def PrintRegisters():
         print("All Registers Have No Values")
 
     print ("| PC = " + str(pc) + " |")
-    print("------------")
+
+# prints the seeds values
+def PrintSeeds():
+    print("******************************************************")
+    print("\t\t\t\t\t\t\t| S E E D S |        \n")
+    i = 4                                       # starting at 0x2010
+    while i < 20:       #S0 - S15
+        print("* S" + str(i-4) + "\t= " + str(MemoryArray[i]))
+        i += 1
+
+# prints the average of the seeds values
+def PrintAverage():
+    global avg
+    i = 4
+    seed_sum = 0
+    while i < 20:
+        seed_sum += MemoryArray[i]
+        i += 1
+
+    avg = seed_sum / 4
+    MemoryArray[3] = avg                        # store avg in Mem[0x200c]
+    print("Seed Sum:\t\t" + str(seed_sum))
+    print("Seed Average:\t\t" + str(MemoryArray[3]))
+
+# # prints the hamming weight
+def PrintHamW():
+    one_ctr = 0
+    for i in range(16):                         # iterate through all seeds
+        test_num = MemoryArray[i + 4]           # test each seeds
+        test_str = format(test_num, '032b')
+        for j in range(32):                     # count no. of '1' for each seeds
+            if test_str[j] == '1':
+                one_ctr += 1
+        HamWt_Array.append(one_ctr)             # populating HamWt_Array
+        one_ctr = 0                             # reset one_ctr for next seed
+
+    # calculate average hamming weight
+    sum_hamwt = 0
+    for i in range(16):
+        sum_hamwt += HamWt_Array[i]
+    avg_hamwt = sum_hamwt / 16
+    MemoryArray[0] = avg_hamwt
+    print("Average Hamming Weight:\t" + str(avg_hamwt))
+
+# print the instruction count
+def PrintInstrCnt():
+    global instr_count
+    print('Instruction Count:\t' + str(instr_count))
 
 # takes an actual register name (i.e. if $8 then int_reg = 8) and returns an index to be usable in reg[] array
 def GiveMeRegIndex(int_reg):
@@ -393,6 +449,23 @@ def Decoder(curr_bin):
         pc += 4
         curr_int_str = ("lw $" + str(int_rt) + ", " + str(int_imm) + "($" + str(int_rs) + ")")
 
+    ############################################# START OF J-TYPE  #############################################
+    elif curr_bin[0:6] == "000010":             # JUMP
+        
+        bin_imm = curr_bin[6:32] 
+        imm_sign = curr_bin[6]
+
+        pc += 4
+        
+        if(imm_sign == '1'):            #immediate is negative
+            imm =TwosComp_26(bin_imm)   #convert integer->two's comp-> integer with correct sign
+                    
+        else:                   #immediate is positive
+                imm = int(bin_imm,2)    #convert to integer
+            
+        pc += (imm*4)
+        curr_int_str = ("jump", imm)
+        print("curr_bin is", curr_bin, "imm_sign is", imm_sign)
 
 # MAIN FUNCTION
 def main():
@@ -400,15 +473,24 @@ def main():
     print(Hex_Machine_Array)
     print(Bin_Machine_Array)
 
+    global instr_count
     while ProcessState == 'ON':
         i = pc2Index(pc)
         Decoder(Bin_Machine_Array[i])
-        print("\n\t\t\tNEW INSTRUCTION")
-        print(curr_int_str)
-        PrintRegisters()
-
+        instr_count += 1
+    
     if ProcessState == 'OFF':
-        print(MemoryArray)
+        print('\n\n\n')
+        print("//////////////////////////////////////////////////////////////////////////")
+        print("//////////////////////// F I N A L  R E S U L T //////////////////////////")
+        print("//////////////////////////////////////////////////////////////////////////")
+        print('\n')
+        PrintSeeds()
+        PrintAverage()
+        PrintHamW()
+        PrintInstrCnt()
+        PrintRegisters()
+        PrintMemory()
 
 # These next lines are necessary in Python in order for the Python interpreter to call the main function. 
 if __name__ == "__main__":
